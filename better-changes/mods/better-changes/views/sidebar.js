@@ -180,7 +180,108 @@ export const sidebarMethods = {
     });
   },
 
+  toggleCommitBox(cx) {
+    this.commitBoxCollapsed = !this.commitBoxCollapsed;
+    localStorage.setItem("better-changes.commit-collapsed", this.commitBoxCollapsed ? "1" : "0");
+    cx.notify();
+  },
+
+  cycleCommitBoxHeight(cx) {
+    // Cycle between compact (110px), medium (175px), large (250px)
+    const current = this.commitBoxHeight || 140;
+    let next = 140;
+    if (current <= 120) next = 175;
+    else if (current <= 180) next = 250;
+    else next = 110;
+    this.commitBoxHeight = next;
+    localStorage.setItem("better-changes.commit-height", String(next));
+    cx.notify();
+  },
+
+  renderBranchCard(t) {
+    const branch = this.branch ?? "HEAD";
+    const repo = this.repo ?? "";
+    const isMain = ["main", "master"].includes(branch);
+    const prData = (shared("branch-pr.status") ?? {})[branch];
+    const prNumber = prData?.number ? `#${prData.number}` : null;
+    const prTitle = prData?.title ?? null;
+    const prState = prData?.state ?? (isMain ? "main branch" : "local branch");
+
+    return v_flex()
+      .id("branch-pr-card")
+      .flex_none()
+      .px(10)
+      .py(6)
+      .border_b(1)
+      .border_color(t.border)
+      .bg(t.raised ?? t.surface)
+      .child(
+        h_flex()
+          .items_center()
+          .justify_between()
+          .gap(6)
+          .child(
+            h_flex()
+              .flex_1()
+              .min_w(0)
+              .items_center()
+              .gap(6)
+              .child(
+                div()
+                  .text_color(isMain ? t.dim : t.ansi2)
+                  .child("🌿"),
+              )
+              .child(
+                div()
+                  .truncate()
+                  .font_bold()
+                  .text_size(TEXT.small)
+                  .text_color(t.foreground)
+                  .child(branch),
+              ),
+          )
+          .child(
+            h_flex()
+              .flex_none()
+              .items_center()
+              .gap(4)
+              .when(Boolean(prNumber), (el) =>
+                el.child(
+                  div()
+                    .px(5)
+                    .py(1)
+                    .rounded(4)
+                    .bg(t.selection ?? t.hover)
+                    .text_size(TEXT.caption)
+                    .text_color(t.ansi4)
+                    .child(prNumber),
+                ),
+              )
+              .child(
+                div()
+                  .px(5)
+                  .py(1)
+                  .rounded(4)
+                  .bg(t.hover)
+                  .text_size(TEXT.caption)
+                  .text_color(isMain ? t.dim : t.ansi2)
+                  .child(prState),
+              ),
+          ),
+      )
+      .when(Boolean(prTitle), (el) =>
+        el.child(
+          div()
+            .truncate()
+            .text_size(TEXT.caption)
+            .text_color(t.dim)
+            .child(prTitle),
+        ),
+      );
+  },
+
   renderChanges() {
+    const t = theme();
     const list = v_flex().id("changes-list").flex_1().min_h(0).overflow_y_scrollbar().p(6);
     if (this.error) return list.child(Message(this.error, true));
     const conflicts = this.files.filter((f) => f.conflict);
@@ -205,45 +306,104 @@ export const sidebarMethods = {
     const limit = this.settings.limits.files;
     if (this.total > limit)
       list.child(Message(`Showing the first ${limit.toLocaleString()} changed files.`));
-    return v_flex().id("changes").flex_1().min_h(0).child(list).child(this.renderCommitBox());
+
+    return v_flex()
+      .id("changes")
+      .flex_1()
+      .min_h(0)
+      .child(this.renderBranchCard(t))
+      .child(list)
+      .child(this.renderCommitBox());
   },
 
   renderCommitBox() {
     const t = theme();
     const hint = this.commitBoxHint();
+    const isCollapsed = Boolean(this.commitBoxCollapsed);
+    const height = this.commitBoxHeight || 140;
+
     return v_flex()
       .id("commit-box")
       .flex_none()
-      .p(10)
-      .gap(8)
       .border_t(1)
       .border_color(t.border)
-      .when(Boolean(this.note), (el) =>
-        el.child(
-          div()
-            .text_size(TEXT.small)
-            .text_color(t.ansi1)
-            .whitespace_normal()
-            .child(this.note ?? ""),
-        ),
-      )
       .child(
-        TextBox({
-          id: "commit-message",
-          state: this.input,
-          focused: this.typing,
-          label: "Commit message",
-        }),
+        h_flex()
+          .id("commit-box-header")
+          .px(10)
+          .py(4)
+          .items_center()
+          .justify_between()
+          .bg(t.raised ?? t.surface)
+          .cursor_pointer()
+          .on_click((_e, cx) => this.toggleCommitBox(cx))
+          .child(
+            h_flex()
+              .items_center()
+              .gap(6)
+              .child(
+                div()
+                  .text_size(TEXT.caption)
+                  .text_color(t.dim)
+                  .child(isCollapsed ? "▶" : "▼"),
+              )
+              .child(
+                div()
+                  .text_size(TEXT.caption)
+                  .font_bold()
+                  .text_color(t.dim)
+                  .child("Commit"),
+              ),
+          )
+          .child(
+            h_flex()
+              .items_center()
+              .gap(6)
+              .when(!isCollapsed, (el) =>
+                el.child(
+                  TextButton({
+                    id: "resize-commit",
+                    icon: null,
+                    label: `↕ ${height}px`,
+                    onClick: (cx) => this.cycleCommitBoxHeight(cx),
+                  }),
+                ),
+              ),
+          ),
       )
-      .child(this.renderCommitButton())
-      .when(Boolean(hint), (el) =>
-        el.child(
-          div()
-            .text_size(TEXT.caption)
-            .text_color(this.commitMode === "amend" ? t.working : t.dim)
-            .whitespace_normal()
-            .child(hint ?? ""),
-        ),
+      .when(!isCollapsed, (box) =>
+        box
+          .p(10)
+          .gap(8)
+          .h(height)
+          .overflow_y_scrollbar()
+          .when(Boolean(this.note), (el) =>
+            el.child(
+              div()
+                .text_size(TEXT.small)
+                .text_color(t.ansi1)
+                .whitespace_normal()
+                .child(this.note ?? ""),
+            ),
+          )
+          .child(
+            TextBox({
+              id: "commit-message",
+              state: this.input,
+              focused: this.typing,
+              label: "Commit message",
+            }),
+          )
+          .child(this.renderCommitButton())
+          .when(Boolean(hint), (el) =>
+            el.child(
+              div()
+                .text_size(TEXT.caption)
+                .text_color(this.commitMode === "amend" ? t.working : t.dim)
+                .whitespace_normal()
+                .child(hint ?? ""),
+            ),
+          ),
       );
   },
 
