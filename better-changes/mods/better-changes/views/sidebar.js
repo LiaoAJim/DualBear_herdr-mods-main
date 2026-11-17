@@ -72,45 +72,30 @@ export const sidebarMethods = {
     if (this.mode === "panel-key") return div();
     if (this.mode === "pane-header") return this.renderPaneHeader();
     if (this.mode === "diff") return this.renderDiff();
+    if (this.selectedCommit) {
+      return Panel({ id: "better-changes" })
+        .child(this.renderHeader())
+        .child(this.renderCommit());
+    }
     return Panel({ id: "better-changes" })
       .child(this.renderHeader())
-      .child(
-        this.tab === "commit"
-          ? this.selectedCommit
-            ? this.renderCommit()
-            : this.renderHistory()
-          : this.renderChanges(),
-      );
+      .child(this.renderChanges())
+      .child(this.renderCommitsAccordion());
   },
 
   renderHeader() {
-    const unpushed = this.committed?.unpushed.size;
     return PanelHeader()
       .child(
         h_flex()
           .flex_1()
           .min_w(0)
-          .ml(-8) // Lines the pills up with the list rows below.
-          .gap(4)
           .items_center()
-          .role("tab_list")
           .child(
-            HeaderTab({
-              id: "tab-changes",
-              label: "Changes",
-              count: this.total || null,
-              active: this.tab === "changes",
-              onClick: (cx) => this.setTab("changes", cx),
-            }),
-          )
-          .child(
-            HeaderTab({
-              id: "tab-commit",
-              label: "Commits",
-              count: unpushed,
-              active: this.tab === "commit",
-              onClick: (cx) => this.setTab("commit", cx),
-            }),
+            div()
+              .font_bold()
+              .text_size(TEXT.body ?? 13)
+              .text_color(theme().foreground)
+              .child("Source Control"),
           ),
       )
       .child(
@@ -123,6 +108,100 @@ export const sidebarMethods = {
         }),
       )
       .child(this.renderMore());
+  },
+
+  toggleCommitsSection(cx) {
+    this.commitsSectionCollapsed = !this.commitsSectionCollapsed;
+    localStorage.setItem("better-changes.commits-section-collapsed", this.commitsSectionCollapsed ? "1" : "0");
+    if (!this.commitsSectionCollapsed) this.loadCommits(cx);
+    cx.notify();
+  },
+
+  cycleCommitsHeight(cx) {
+    const current = this.commitsSectionHeight || 200;
+    let next = 200;
+    if (current <= 160) next = 260;
+    else if (current <= 280) next = 380;
+    else next = 150;
+    this.commitsSectionHeight = next;
+    localStorage.setItem("better-changes.commits-section-height", String(next));
+    cx.notify();
+  },
+
+  renderCommitsAccordion() {
+    const t = theme();
+    const isCollapsed = Boolean(this.commitsSectionCollapsed);
+    const height = this.commitsSectionHeight || 200;
+    const count = this.commits?.length ? `${this.commits.length}` : "";
+
+    return v_flex()
+      .id("commits-accordion")
+      .flex_none()
+      .border_t(1)
+      .border_color(t.border)
+      .child(
+        h_flex()
+          .id("commits-accordion-header")
+          .px(10)
+          .py(6)
+          .items_center()
+          .justify_between()
+          .bg(t.raised ?? t.surface)
+          .cursor_pointer()
+          .on_click((_e, cx) => this.toggleCommitsSection(cx))
+          .child(
+            h_flex()
+              .items_center()
+              .gap(6)
+              .child(
+                div()
+                  .text_size(TEXT.caption)
+                  .text_color(t.dim)
+                  .child(isCollapsed ? "▶" : "▼"),
+              )
+              .child(
+                div()
+                  .text_size(TEXT.small)
+                  .font_bold()
+                  .text_color(t.foreground)
+                  .child("Commits (Graph / History)"),
+              )
+              .when(Boolean(count), (el) =>
+                el.child(
+                  div()
+                    .px(5)
+                    .py(1)
+                    .rounded(10)
+                    .bg(t.hover)
+                    .text_size(TEXT.badge ?? 10)
+                    .text_color(t.dim)
+                    .child(count),
+                ),
+              ),
+          )
+          .child(
+            h_flex()
+              .items_center()
+              .gap(4)
+              .when(!isCollapsed, (el) =>
+                el.child(
+                  TextButton({
+                    id: "resize-commits",
+                    icon: null,
+                    label: `↕ ${height}px`,
+                    onClick: (cx) => this.cycleCommitsHeight(cx),
+                  }),
+                ),
+              ),
+          ),
+      )
+      .when(!isCollapsed, (box) =>
+        box
+          .h(height)
+          .flex_none()
+          .min_h(80)
+          .child(this.renderHistory()),
+      );
   },
 
   refreshAll(cx) {
