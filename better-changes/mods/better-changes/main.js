@@ -104,8 +104,8 @@ class BetterChanges extends View {
     this.amendLoading = false;
     this.amendHead = null;
     this.typing = false;
-    // Enter makes a new line here; only the button commits.
-    this.input = TextareaState.new({ placeholder: "Commit message", rows: 4 });
+    // 2 rows by default to fit nicely with the Commit button
+    this.input = TextareaState.new({ placeholder: "Commit message", rows: 2 });
     this.input.on("change", (_e, cx) => {
       this.message = this.input.value();
       this.messageRevision++;

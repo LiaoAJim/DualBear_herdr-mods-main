@@ -451,7 +451,7 @@ export const sidebarMethods = {
     const t = theme();
     const hint = this.commitBoxHint();
     const isCollapsed = Boolean(this.commitBoxCollapsed);
-    const height = this.commitBoxHeight || 140;
+    const height = Math.max(120, this.commitBoxHeight || 165);
 
     return v_flex()
       .id("commit-box")
@@ -495,10 +495,11 @@ export const sidebarMethods = {
       )
       .when(!isCollapsed, (box) =>
         box
-          .p(10)
-          .gap(8)
-          .h(height)
-          .overflow_y_scrollbar()
+          .px(10)
+          .pt(8)
+          .pb(6)
+          .gap(6)
+          .min_h(height)
           .when(Boolean(this.note), (el) =>
             el.child(
               div()
