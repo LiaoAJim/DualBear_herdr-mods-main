@@ -78,6 +78,8 @@ export const sidebarMethods = {
         .child(this.renderCommit());
     }
     return Panel({ id: "better-changes" })
+      .on_mouse_move((e, cx) => this.onDragMouseMove(e, cx))
+      .on_mouse_up("left", (_e, cx) => this.stopDrag(cx))
       .child(this.renderHeader())
       .child(this.renderChanges())
       .child(this.renderCommitsAccordion());
@@ -140,10 +142,30 @@ export const sidebarMethods = {
       .border_t(1)
       .border_color(t.border)
       .child(
+        // Drag Resizing Splitter Bar for Commits section
+        h_flex()
+          .id("commits-drag-handle")
+          .h(6)
+          .w_full()
+          .cursor_row_resize()
+          .items_center()
+          .justify_center()
+          .when(Boolean(this.draggingCommits), (el) => el.bg(t.accent ?? t.hover))
+          .hover((el) => el.bg(t.accent ?? t.hover))
+          .on_mouse_down("left", (e, cx) => this.startDragCommits(e, cx))
+          .child(
+            div()
+              .w(24)
+              .h(2)
+              .rounded(1)
+              .bg(t.dim),
+          ),
+      )
+      .child(
         h_flex()
           .id("commits-accordion-header")
           .px(10)
-          .py(6)
+          .py(4)
           .items_center()
           .justify_between()
           .bg(t.raised ?? t.surface)
@@ -180,19 +202,10 @@ export const sidebarMethods = {
               ),
           )
           .child(
-            h_flex()
-              .items_center()
-              .gap(4)
-              .when(!isCollapsed, (el) =>
-                el.child(
-                  TextButton({
-                    id: "resize-commits",
-                    icon: null,
-                    label: `↕ ${height}px`,
-                    onClick: (cx) => this.cycleCommitsHeight(cx),
-                  }),
-                ),
-              ),
+            div()
+              .text_size(TEXT.caption)
+              .text_color(t.dim)
+              .child(isCollapsed ? "folded" : `${height}px`),
           ),
       )
       .when(!isCollapsed, (box) =>
@@ -259,10 +272,48 @@ export const sidebarMethods = {
     });
   },
 
-  toggleCommitBox(cx) {
-    this.commitBoxCollapsed = !this.commitBoxCollapsed;
-    localStorage.setItem("better-changes.commit-collapsed", this.commitBoxCollapsed ? "1" : "0");
-    cx.notify();
+  // ── Drag Resizing ────────────────────────────────────────────────────────
+  startDragCommitBox(e, cx) {
+    this.draggingCommitBox = true;
+    this.dragStartY = e.position.y;
+    this.dragStartHeight = this.commitBoxHeight || 140;
+    cx.stop_propagation();
+  },
+
+  onDragMouseMove(e, cx) {
+    if (this.draggingCommitBox) {
+      const deltaY = this.dragStartY - e.position.y; // Dragging up increases height
+      const newHeight = Math.max(80, Math.min(500, Math.round(this.dragStartHeight + deltaY)));
+      if (newHeight !== this.commitBoxHeight) {
+        this.commitBoxHeight = newHeight;
+        localStorage.setItem("better-changes.commit-height", String(newHeight));
+        cx.notify();
+      }
+    }
+    if (this.draggingCommits) {
+      const deltaY = this.dragCommitsStartY - e.position.y; // Dragging up increases height
+      const newHeight = Math.max(90, Math.min(650, Math.round(this.dragCommitsStartHeight + deltaY)));
+      if (newHeight !== this.commitsSectionHeight) {
+        this.commitsSectionHeight = newHeight;
+        localStorage.setItem("better-changes.commits-section-height", String(newHeight));
+        cx.notify();
+      }
+    }
+  },
+
+  stopDrag(cx) {
+    if (this.draggingCommitBox || this.draggingCommits) {
+      this.draggingCommitBox = false;
+      this.draggingCommits = false;
+      cx.notify();
+    }
+  },
+
+  startDragCommits(e, cx) {
+    this.draggingCommits = true;
+    this.dragCommitsStartY = e.position.y;
+    this.dragCommitsStartHeight = this.commitsSectionHeight || 200;
+    cx.stop_propagation();
   },
 
   cycleCommitBoxHeight(cx) {
@@ -407,10 +458,30 @@ export const sidebarMethods = {
       .border_t(1)
       .border_color(t.border)
       .child(
+        // Drag Resizing Splitter Bar
+        h_flex()
+          .id("commit-drag-handle")
+          .h(6)
+          .w_full()
+          .cursor_row_resize()
+          .items_center()
+          .justify_center()
+          .when(Boolean(this.draggingCommitBox), (el) => el.bg(t.accent ?? t.hover))
+          .hover((el) => el.bg(t.accent ?? t.hover))
+          .on_mouse_down("left", (e, cx) => this.startDragCommitBox(e, cx))
+          .child(
+            div()
+              .w(24)
+              .h(2)
+              .rounded(1)
+              .bg(t.dim),
+          ),
+      )
+      .child(
         h_flex()
           .id("commit-box-header")
           .px(10)
-          .py(4)
+          .py(3)
           .items_center()
           .justify_between()
           .bg(t.raised ?? t.surface)
@@ -435,19 +506,10 @@ export const sidebarMethods = {
               ),
           )
           .child(
-            h_flex()
-              .items_center()
-              .gap(6)
-              .when(!isCollapsed, (el) =>
-                el.child(
-                  TextButton({
-                    id: "resize-commit",
-                    icon: null,
-                    label: `↕ ${height}px`,
-                    onClick: (cx) => this.cycleCommitBoxHeight(cx),
-                  }),
-                ),
-              ),
+            div()
+              .text_size(TEXT.caption)
+              .text_color(t.dim)
+              .child(isCollapsed ? "folded" : `${height}px`),
           ),
       )
       .when(!isCollapsed, (box) =>
