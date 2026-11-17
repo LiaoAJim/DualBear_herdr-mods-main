@@ -1,0 +1,8 @@
+.DS_Store
+*.error
+__pycache__/
+node_modules/
+herdr.d.ts
+gpui-kit.d.ts
+jsconfig.json
+*/helper/helper
