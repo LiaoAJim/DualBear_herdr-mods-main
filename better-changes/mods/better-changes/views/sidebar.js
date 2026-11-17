@@ -282,7 +282,8 @@ export const sidebarMethods = {
 
   onDragMouseMove(e, cx) {
     if (this.draggingCommitBox) {
-      const deltaY = this.dragStartY - e.position.y; // Dragging up increases height
+      // Commit box is at the top now: dragging down increases height
+      const deltaY = e.position.y - this.dragStartY;
       const newHeight = Math.max(80, Math.min(500, Math.round(this.dragStartHeight + deltaY)));
       if (newHeight !== this.commitBoxHeight) {
         this.commitBoxHeight = newHeight;
@@ -442,8 +443,8 @@ export const sidebarMethods = {
       .flex_1()
       .min_h(0)
       .child(this.renderBranchCard(t))
-      .child(list)
-      .child(this.renderCommitBox());
+      .child(this.renderCommitBox())
+      .child(list);
   },
 
   renderCommitBox() {
@@ -455,28 +456,8 @@ export const sidebarMethods = {
     return v_flex()
       .id("commit-box")
       .flex_none()
-      .border_t(1)
+      .border_b(1)
       .border_color(t.border)
-      .child(
-        // Drag Resizing Splitter Bar
-        h_flex()
-          .id("commit-drag-handle")
-          .h(6)
-          .w_full()
-          .cursor_row_resize()
-          .items_center()
-          .justify_center()
-          .when(Boolean(this.draggingCommitBox), (el) => el.bg(t.accent ?? t.hover))
-          .hover((el) => el.bg(t.accent ?? t.hover))
-          .on_mouse_down("left", (e, cx) => this.startDragCommitBox(e, cx))
-          .child(
-            div()
-              .w(24)
-              .h(2)
-              .rounded(1)
-              .bg(t.dim),
-          ),
-      )
       .child(
         h_flex()
           .id("commit-box-header")
@@ -502,7 +483,7 @@ export const sidebarMethods = {
                   .text_size(TEXT.caption)
                   .font_bold()
                   .text_color(t.dim)
-                  .child("Commit"),
+                  .child("Commit Message"),
               ),
           )
           .child(
@@ -545,6 +526,28 @@ export const sidebarMethods = {
                 .child(hint ?? ""),
             ),
           ),
+      )
+      .when(!isCollapsed, (box) =>
+        box.child(
+          // Drag Resizing Splitter Bar at bottom of commit box (above unstaged list)
+          h_flex()
+            .id("commit-drag-handle")
+            .h(6)
+            .w_full()
+            .cursor_row_resize()
+            .items_center()
+            .justify_center()
+            .when(Boolean(this.draggingCommitBox), (el) => el.bg(t.accent ?? t.hover))
+            .hover((el) => el.bg(t.accent ?? t.hover))
+            .on_mouse_down("left", (e, cx) => this.startDragCommitBox(e, cx))
+            .child(
+              div()
+                .w(24)
+                .h(2)
+                .rounded(1)
+                .bg(t.dim),
+            ),
+        ),
       );
   },
 
